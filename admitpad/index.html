@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>admitpad</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playwrite+VN:wght@100..400&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      font-size: 0.9em;
+    }
+    h1 {
+      font-family: "Playwrite VN", sans-serif;
+      color: rgb(173, 125, 3);
+    }
+    .container {
+      width: 90%; 
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .top-single-line-wrapper {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .lock-icon {
+      margin-right: 0.5rem;
+      cursor: default;
+    }
+    #topSingleLine {
+      flex: 1; 
+      min-height: 1.5rem; 
+      max-height: 2rem;   
+      background-color: #eee;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      overflow-y: auto;
+    }
+    #topSingleLine:empty:before {
+      content: attr(data-placeholder);
+      color: #aaa;
+    }
+    #freeFormNotes {
+      width: 100%;
+      min-height: 300px;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      overflow-y: auto;
+    }
+    #freeFormNotes:empty:before {
+      content: attr(data-placeholder);
+      color: #aaa;
+    }
+    .table-section {
+      margin-top: 2rem;
+      overflow-x: auto;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+    }
+    #problemTable {
+      border-collapse: collapse;
+      table-layout: auto;
+      width: auto;
+    }
+    #problemTable tr:first-child td {
+      font-weight: bold;
+    }
+    #problemTable td {
+      border: 1px solid #ccc;
+      min-width: 350px;
+      max-width: 500px;
+      vertical-align: top;
+      padding: 0.5rem;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+    #problemTable td:empty:not(.trash-icon-cell)::before {
+      content: attr(data-placeholder);
+      color: #aaa;
+    }
+    #addColumnBtn {
+      margin-top: 1rem;
+      margin-bottom: -2rem;
+      padding: 10px 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      background-color: #61adff;
+      color: black;
+      border: none;
+      border-radius: 10px;
+    }
+    .trash-icon {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background-color: #ffdddd;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      cursor: pointer;
+      margin-left: 2.5rem;
+    }
+    .move-button {
+      background-color: #fff3c4;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 0.25rem;
+    }
+    #clearAllBtn, #exportBtn {
+      margin-top: 2rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      background-color: #ffe0e0;
+      border: 1px solid #ccc;
+      margin-right: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <center><h1>admitpad</h1></center>
+    
+    <div class="top-single-line-wrapper">
+      <div class="lock-icon" title="All data on this page is completely locally-stored.">🔒</div>
+      <div id="topSingleLine" data-placeholder="Patient Name" contenteditable="true"></div>
+    </div>
+
+    <div id="freeFormNotes" data-placeholder="Type your notes here..." contenteditable="true"></div>
+
+    <button type="button" id="addColumnBtn">+ Column 📊</button>
+
+    <div class="table-section">
+      <table id="problemTable">
+        <tbody>
+          <tr>
+            <td contenteditable="true" data-placeholder="Problem Title"></td>
+          </tr>
+          <tr>
+            <td contenteditable="true" data-placeholder="Workup"></td>
+          </tr>
+          <tr>
+            <td contenteditable="true" data-placeholder="Plan"></td>
+          </tr>
+          <tr>
+            <td contenteditable="false" class="trash-icon-cell">
+              <button class="move-button move-left">←</button>
+              <button class="move-button move-right">→</button>
+              <div class="trash-icon">🗑</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <button id="clearAllBtn">Clear All</button>
+    <button id="exportBtn">Export</button>
+    <!-- AI Feature button is commented out -->
+  </div>
+
+  <script>
+    const topSingleLine = document.getElementById('topSingleLine');
+    const freeFormNotes = document.getElementById('freeFormNotes');
+    const problemTable = document.getElementById('problemTable');
+    const addColumnBtn = document.getElementById('addColumnBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    function saveToLocalStorage() {
+      const topVal = topSingleLine.innerHTML;
+      const notesVal = freeFormNotes.innerHTML;
+      const tableRows = problemTable.querySelectorAll('tr');
+      const tableData = [];
+      tableRows.forEach(row => {
+        const cellData = [];
+        row.querySelectorAll('td').forEach(cell => cellData.push(cell.innerHTML));
+        tableData.push(cellData);
+      });
+      const data = {
+        topSingleLine: topVal,
+        freeFormNotes: notesVal,
+        tableData: tableData
+      };
+      localStorage.setItem('admissionData', JSON.stringify(data));
+    }
+
+    function loadFromLocalStorage() {
+      const stored = localStorage.getItem('admissionData');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.topSingleLine) {
+          topSingleLine.innerHTML = data.topSingleLine;
+        }
+        if (data.freeFormNotes) {
+          freeFormNotes.innerHTML = data.freeFormNotes;
+        }
+        if (data.tableData) {
+          problemTable.innerHTML = '';
+          data.tableData.forEach(rowArr => {
+            const tr = document.createElement('tr');
+            rowArr.forEach(cellHTML => {
+              const td = document.createElement('td');
+              td.innerHTML = cellHTML;
+              tr.appendChild(td);
+            });
+            problemTable.appendChild(tr);
+          });
+        }
+      }
+      applyCellEditability();
+    }
+
+    function applyCellEditability() {
+      const rows = problemTable.querySelectorAll('tr');
+      rows.forEach((row, i) => {
+        const cells = row.querySelectorAll('td');
+        cells.forEach(cell => {
+          if (i < 3) {
+            cell.contentEditable = 'true';
+          } else {
+            cell.contentEditable = 'false';
+          }
+        });
+      });
+    }
+
+    function deleteColumn(colIndex) {
+      if (!confirm('Are you sure you want to delete this column?')) return;
+      const rows = problemTable.querySelectorAll('tr');
+      rows.forEach(row => {
+        if (row.children[colIndex]) {
+          row.removeChild(row.children[colIndex]);
+        }
+      });
+      saveToLocalStorage();
+    }
+
+    function moveColumn(colIndex, offset) {
+      const rows = problemTable.querySelectorAll('tr');
+      const colCount = rows[0].children.length;
+      const newIndex = colIndex + offset;
+      if (newIndex < 0 || newIndex >= colCount) return;
+      rows.forEach(row => {
+        const cells = row.children;
+        if (colIndex < cells.length && newIndex < cells.length) {
+          const toMove = cells[colIndex];
+          row.removeChild(toMove);
+          if (newIndex >= row.children.length) {
+            row.appendChild(toMove);
+          } else {
+            row.insertBefore(toMove, row.children[newIndex]);
+          }
+        }
+      });
+      saveToLocalStorage();
+    }
+
+    function clearAll() {
+      if (!confirm('Are you sure you want to clear all data?')) return;
+      topSingleLine.innerHTML = '';
+      freeFormNotes.innerHTML = '';
+      problemTable.innerHTML = `
+        <tbody>
+          <tr><td contenteditable="true" data-placeholder="Problem Title"></td></tr>
+          <tr><td contenteditable="true" data-placeholder="Workup"></td></tr>
+          <tr><td contenteditable="true" data-placeholder="Plan"></td></tr>
+          <tr>
+            <td contenteditable="false" class="trash-icon-cell">
+              <button class="move-button move-left">←</button>
+              <button class="move-button move-right">→</button>
+              <div class="trash-icon">🗑</div>
+            </td>
+          </tr>
+        </tbody>
+      `;
+      localStorage.removeItem('admissionData');
+    }
+
+    function getColumns() {
+      const rows = problemTable.querySelectorAll('tr');
+      if (!rows.length) return [];
+      const colCount = rows[0].children.length;
+      const columns = [];
+      for (let c = 0; c < colCount; c++) {
+        let colData = [];
+        rows.forEach(row => {
+          colData.push(row.children[c].innerHTML);
+        });
+        columns.push(colData);
+      }
+      return columns;
+    }
+
+    function generateExportHTML() {
+      const nameVal = topSingleLine.innerHTML || "(No Name Entered)";
+      const notesVal = freeFormNotes.innerHTML || "(No Notes Entered)";
+      let out = `<div>${nameVal}</div><div>${notesVal}</div><br/><h3><u>Assessment and Plan:</u></h3>`;
+      const columns = getColumns();
+      columns.forEach(col => {
+        const prob = col[0] || "";
+        const work = col[1] || "";
+        const plan = col[2] || "";
+        out += `<div><b>${prob}</b></div><div>${work}</div><div><br><u>Plan:</u></div><div>${plan}</div><br/><br/>`;
+      });
+      return out;
+    }
+
+    // On page load
+    window.addEventListener('load', () => {
+      loadFromLocalStorage();
+    });
+
+    // Listen for changes in text boxes
+    topSingleLine.addEventListener('input', saveToLocalStorage);
+    freeFormNotes.addEventListener('input', saveToLocalStorage);
+
+    // Table editing
+    problemTable.addEventListener('input', saveToLocalStorage);
+
+    // Table clicks for trash/move
+    problemTable.addEventListener('click', e => {
+      if (e.target.classList.contains('trash-icon')) {
+        const td = e.target.closest('td');
+        if (!td) return;
+        deleteColumn(td.cellIndex);
+      } else if (e.target.classList.contains('move-left')) {
+        const td = e.target.closest('td');
+        if (!td) return;
+        moveColumn(td.cellIndex, -1);
+      } else if (e.target.classList.contains('move-right')) {
+        const td = e.target.closest('td');
+        if (!td) return;
+        moveColumn(td.cellIndex, 1);
+      }
+    });
+
+    // Add new column
+    addColumnBtn.addEventListener('click', () => {
+      const rows = problemTable.querySelectorAll('tr');
+      rows.forEach((row, i) => {
+        const newTd = document.createElement('td');
+        if (i < 3) {
+          newTd.contentEditable = 'true';
+        } else {
+          newTd.contentEditable = 'false';
+          newTd.classList.add('trash-icon-cell');
+          newTd.innerHTML = `
+            <button class="move-button move-left">←</button>
+            <button class="move-button move-right">→</button>
+            <div class="trash-icon">🗑</div>
+          `;
+        }
+        if (i === 0) newTd.setAttribute('data-placeholder', 'Problem Title');
+        else if (i === 1) newTd.setAttribute('data-placeholder', 'Workup');
+        else if (i === 2) newTd.setAttribute('data-placeholder', 'Plan');
+        row.appendChild(newTd);
+      });
+      saveToLocalStorage();
+    });
+
+    clearAllBtn.addEventListener('click', clearAll);
+
+    // Export
+    exportBtn.addEventListener('click', () => {
+      const expHTML = generateExportHTML();
+      const w = window.open('', '_blank');
+      if (!w) {
+        alert("Popup blocked! Please allow popups for this site.");
+        return;
+      }
+      w.document.write(`
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>admitpad - Export</title>
+<style>body { font-family: Arial, sans-serif; margin: 1rem; } #exportContent { white-space: pre-wrap; }
+.copy-btn { margin: 1rem 0; padding: 0.5rem 1rem; background: #e0ffe0; border: 1px solid #ccc; cursor: pointer; }
+</style></head><body>
+<div id="exportContent">${expHTML}</div>
+<button class="copy-btn" onclick="(function(){
+  const exportDiv=document.getElementById('exportContent');
+  const range=document.createRange();
+  range.selectNode(exportDiv);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try{
+    document.execCommand('copy');
+    alert('Copied to clipboard!');
+  }catch(e){
+    alert('Error copying. Please select & copy manually.');
+  }
+  sel.removeAllRanges();
+})();">Copy</button>
+</body></html>`);
+      w.document.close();
+    });
+  </script>
+</body>
+</html>
